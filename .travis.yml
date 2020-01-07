@@ -7,4 +7,4 @@ cache: pip
 install:
   - pip install -r requirements.txt
 script:
-  - python -m unittest change_point/identification/synthesis_test.py
+  - python -m unittest change_point_identification/synthesis_test.py
