@@ -4,6 +4,7 @@ import collections
 import itertools
 import matplotlib.pyplot as plt
 
+# test
 class PerformanceHistorySynthesizer:
 
     def __init__(self,
