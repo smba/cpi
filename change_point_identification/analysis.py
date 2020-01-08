@@ -1,7 +1,7 @@
 import numpy as np
 import itertools
-from synthesis import PerformanceHistorySynthesizer
 import matplotlib.pyplot as plt
+import synthesis
 
 def find_runs(value, a):
     # Create an array that is 1 where a is `value`, and pad each end with an extra 0.
@@ -24,15 +24,31 @@ class Transformation:
         :param obs:
         :param epsilon:
         '''
-        observed = sorted(obs.keys())
         
+        # bias correction
+        min_x = min(obs.keys())
+        max_x = max(obs.keys())
+        print(min_x, max_x)
+        half_n_revisions = n_revisions // 2
+        n_sample = len(obs)
+        obs_corrected = {x: obs[min_x] for x in np.random.choice(np.arange(half_n_revisions), size=n_sample)}
+        obs_corrected.update(
+            {n_revisions +half_n_revisions + x: obs[max_x] for x in np.random.choice(np.arange(half_n_revisions), size=n_sample)}
+        )
+        obs_corrected.update(
+            {x + half_n_revisions: obs[x] for x in obs}
+        )
+                
+        observed = sorted(obs_corrected.keys())
+                  
         # tune window size delta
         yss = {}
         dd = []
         for delta in range(n_revisions // 4):        
-            ys = np.zeros(n_revisions)
+            ys = np.zeros(2*n_revisions)
+            #print(observed)
             for a, b in itertools.combinations(observed, 2):
-                if np.abs(b - a) < delta and np.abs(obs[b] - obs[a]) > epsilon:
+                if np.abs(b - a) < delta and np.abs(obs_corrected[b] - obs_corrected[a]) > epsilon:
                     ys[a:b] += 1.0
             yss[delta] = ys
             
@@ -41,11 +57,12 @@ class Transformation:
         # optimal window size (trade-off between information used and number of segments)
         opt = np.argsort(dd, kind="stable")[-1]
         
-        return yss[opt]
+        # remove bias correction
+        return yss[opt][half_n_revisions:n_revisions + half_n_revisions]
             
 class GroupSamplingEstimator():
     
-    def __init__(self, synthesizer: PerformanceHistorySynthesizer):
+    def __init__(self, synthesizer: synthesis.PerformanceHistorySynthesizer):
         self.synthesizer = synthesizer
         
     def initialize(self, sample_size: int, sample_rate: float = 0.05, p_select: float = 0.5):
@@ -95,5 +112,5 @@ class GroupSamplingEstimator():
 #s = Transformation().transform_single(1000, {i: dd[i] for i in np.random.choice(np.arange(1000), size=50, replace=False)})
 
 
-gse = GroupSamplingEstimator(PerformanceHistorySynthesizer())
-gse.initialize(20, 0.06, 0.85)
+gse = GroupSamplingEstimator(synthesis.PerformanceHistorySynthesizer())
+gse.initialize(20, 0.05, 0.85)
