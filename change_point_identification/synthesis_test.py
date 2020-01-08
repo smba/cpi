@@ -1,5 +1,5 @@
 import unittest
-from change_point_identification.synthesis import PerformanceHistorySynthesizer
+from synthesis import PerformanceHistorySynthesizer
 from sklearn.model_selection import ParameterGrid
 import numpy as np
 

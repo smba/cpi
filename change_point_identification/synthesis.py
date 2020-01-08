@@ -9,10 +9,10 @@ class PerformanceHistorySynthesizer:
 
     def __init__(self,
                  n_revisions: int = 1000,
-                 n_features: int = 10,
-                 p_influential: int = 0.1,
+                 n_features: int = 50,
+                 p_influential: int = 0.08,
                  n_changepoints: int = 5,
-                 p_geom: float = 0.9,
+                 p_geom: float = 0.85,
                  noise: float = 0.1,
                  seed: int = 1234):
         '''
@@ -26,8 +26,8 @@ class PerformanceHistorySynthesizer:
         :param seed: Seed to set on random number generators (random and numpy.random )
         '''
         
-        self.__n_revisions = n_revisions
-        self.__n_features = n_features
+        self.n_revisions = n_revisions
+        self.n_features = n_features
         self.__n_influential = int(p_influential * n_features)
         self.__n_changepoints = min(n_changepoints, n_revisions)
         self.__p_geom = p_geom
@@ -62,7 +62,7 @@ class PerformanceHistorySynthesizer:
             # initial influence is between 25 and 75
             influence = np.random.uniform(25, 75)
             sign = -1 if random.random() < 0.5 else 1
-            terms.append([factor, sign * influence])
+            terms.append([[factor], sign * influence])
         
         # Synthesize and distribute change points among influential factors
         self.change_points = []
@@ -79,6 +79,7 @@ class PerformanceHistorySynthesizer:
         
         # keep list of terms (initial model) and respective generate function
         self.__terms = terms
+       
         self.generate = lambda x: np.sum([np.prod([x[i] for i in term[0]]) * term[1] for term in terms])
         
     def synthesize(self, x: np.ndarray, revision: int = None):
@@ -90,11 +91,11 @@ class PerformanceHistorySynthesizer:
         :param revision: Revision count (int) of which performance should be synthesized (default: None)
         '''
         y = self.generate(x)
-        ys = np.full(self.__n_revisions, y)
+        ys = np.full(self.n_revisions, y)
         for cp in self.change_points:
             do = np.prod(x[np.array(cp[1][0])])
             if do == 1:
                 ys[cp[0]:] *= cp[2]
         result = ys[revision] if revision == None else ys
-        return result
+        return result.reshape(1, -1)[0]
         

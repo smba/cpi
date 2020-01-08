@@ -1,6 +1,7 @@
 import numpy as np
 import itertools
-from change_point_identification.synthesis import PerformanceHistorySynthesizer
+from synthesis import PerformanceHistorySynthesizer
+import matplotlib.pyplot as plt
 
 def find_runs(value, a):
     # Create an array that is 1 where a is `value`, and pad each end with an extra 0.
@@ -48,12 +49,51 @@ class GroupSamplingEstimator():
         self.synthesizer = synthesizer
         
     def initialize(self, sample_size: int, sample_rate: float = 0.05, p_select: float = 0.5):
-        n_features = self.synthesizer.__n_features
-        
-        
-        
-dd = np.zeros(1000)
-dd[400:] += 1
-dd[800:] += 2
-s = Transformation().transform_single(1000, {i: dd[i] for i in np.random.choice(np.arange(1000), size=50, replace=False)})
 
+        n_features = self.synthesizer.n_features
+        n_revisions = self.synthesizer.n_revisions
+        
+        # Sample initial configurations
+        # Remove duplicates from configurations and add new ones if necessary
+        configs = np.random.choice([0, 1], p = [1-p_select, p_select], size=(sample_size, n_features))
+        configs = np.unique(configs, axis=0)
+        while configs.shape[0] < sample_size:
+            n_missing = sample_size - configs.shape[0]
+            config = np.random.choice([0, 1], p = [1-p_select, p_select], size=(n_missing, n_features))
+            configs = np.vstack([configs, config])
+            configs = np.unique(configs, axis=0)
+            
+        # Sample revisions to observe for each configuration
+        n_sample_revisions = int(sample_rate * n_revisions)
+        change_map = []
+        for config in configs:
+            performance = self.synthesizer.synthesize(config)
+            revisions = sorted(np.random.choice(np.arange(n_revisions), size=n_sample_revisions, replace=False))
+            observations = {rev: performance[rev] for rev in revisions}
+            change = Transformation.transform_single(n_revisions, observations, epsilon = 0.01) # TODO tune epsilon
+            change = np.divide(change - np.nanmin(change),np.nanmax(change) - np.nanmin(change))# normalize change
+            change = np.nan_to_num(change)
+            change_map.append(change)
+        change_map = np.vstack(change_map) 
+        
+        ax1 = plt.subplot(2, 1, 1)
+        ax1.pcolormesh(change_map, cmap="jet")
+        ax2 = plt.subplot(2, 1, 2)
+        #for cm in change_map:
+        #    ax2.plot(np.arange(n_revisions), cm)
+        ax2.fill_between(np.arange(n_revisions), np.zeros(n_revisions), np.sum(change_map, axis=0))
+        cps = self.synthesizer.change_points
+        for cp in cps:
+            ax2.axvline(cp[0], color="orange")
+        print(cps)
+        plt.show()
+            
+        
+#dd = np.zeros(1000)
+#dd[400:] += 1
+#dd[800:] += 2
+#s = Transformation().transform_single(1000, {i: dd[i] for i in np.random.choice(np.arange(1000), size=50, replace=False)})
+
+
+gse = GroupSamplingEstimator(PerformanceHistorySynthesizer())
+gse.initialize(20, 0.06, 0.85)
