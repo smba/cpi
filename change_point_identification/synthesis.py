@@ -41,8 +41,6 @@ class PerformanceHistorySynthesizer:
         # We synthesize n_influential terms from the given $n_features.
         termsizes = collections.Counter(np.random.geometric(p=p_geom, size=int(n_features* p_influential)))
         
-        #assert np.max(list(termsizes.keys())) <= n_features, "{} {}".format(np.max(list(termsizes.keys())), n_features)
-        
         # list of factors
         factors = []
         for degree in termsizes:

@@ -95,10 +95,16 @@ class GroupSamplingEstimator():
         
         ax1 = plt.subplot(2, 1, 1)
         ax1.pcolormesh(change_map, cmap="jet")
+        ax1.set_title("Change footprint")
+        ax1.set_xlabel("time")
+        ax1.set_ylabel("configuration")
         ax2 = plt.subplot(2, 1, 2)
         #for cm in change_map:
         #    ax2.plot(np.arange(n_revisions), cm)
         ax2.fill_between(np.arange(n_revisions), np.zeros(n_revisions), np.sum(change_map, axis=0))
+        ax2.set_title("Sum of change point probability")
+        ax2.set_xlabel("time")
+        ax2.set_ylabel("$\sum_{i \in C} p_i(t)$")
         cps = self.synthesizer.change_points
         for cp in cps:
             ax2.axvline(cp[0], color="orange")
@@ -114,3 +120,4 @@ class GroupSamplingEstimator():
 
 gse = GroupSamplingEstimator(synthesis.PerformanceHistorySynthesizer())
 gse.initialize(20, 0.05, 0.85)
+
