@@ -1,7 +1,9 @@
 import numpy as np
 import itertools
 import matplotlib.pyplot as plt
+import scipy.signal as signal
 import synthesis
+import pandas as pd
 
 def find_runs(value, a):
     # Create an array that is 1 where a is `value`, and pad each end with an extra 0.
@@ -28,7 +30,6 @@ class Transformation:
         # bias correction
         min_x = min(obs.keys())
         max_x = max(obs.keys())
-        print(min_x, max_x)
         half_n_revisions = n_revisions // 2
         n_sample = len(obs)
         obs_corrected = {x: obs[min_x] for x in np.random.choice(np.arange(half_n_revisions), size=n_sample)}
@@ -88,27 +89,31 @@ class GroupSamplingEstimator():
             revisions = sorted(np.random.choice(np.arange(n_revisions), size=n_sample_revisions, replace=False))
             observations = {rev: performance[rev] for rev in revisions}
             change = Transformation.transform_single(n_revisions, observations, epsilon = 0.01) # TODO tune epsilon
-            change = np.divide(change - np.nanmin(change),np.nanmax(change) - np.nanmin(change))# normalize change
+            
+            # normalize change
+            change = np.divide(change - np.nanmin(change),np.nanmax(change) - np.nanmin(change))
             change = np.nan_to_num(change)
             change_map.append(change)
-        change_map = np.vstack(change_map) 
-        
-        ax1 = plt.subplot(2, 1, 1)
-        ax1.pcolormesh(change_map, cmap="jet")
+        change_map = np.vstack(change_map)
+                
+        smoothed = np.sum(change_map, axis=0)#pd.DataFrame(np.sum(change_map, axis=0)).rolling(window=30, center=True).mean().values.reshape(1, -1)[0]
+        fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+        ax1.pcolormesh(change_map, cmap="binary")
         ax1.set_title("Change footprint")
         ax1.set_xlabel("time")
         ax1.set_ylabel("configuration")
-        ax2 = plt.subplot(2, 1, 2)
         #for cm in change_map:
         #    ax2.plot(np.arange(n_revisions), cm)
-        ax2.fill_between(np.arange(n_revisions), np.zeros(n_revisions), np.sum(change_map, axis=0))
+        ax2.plot(smoothed / len(configs))
+        ax2.fill_between(np.arange(n_revisions), np.zeros(n_revisions), smoothed.reshape(1, -1)[0] / len(configs), alpha=0.5)
         ax2.set_title("Sum of change point probability")
         ax2.set_xlabel("time")
         ax2.set_ylabel("$\sum_{i \in C} p_i(t)$")
         cps = self.synthesizer.change_points
         for cp in cps:
             ax2.axvline(cp[0], color="orange")
-        print(cps)
+        for cp in signal.find_peaks(smoothed, prominence=.5)[0]:
+            ax2.axvline(cp, color="lime", alpha=0.7)
         plt.show()
             
         
@@ -119,5 +124,5 @@ class GroupSamplingEstimator():
 
 
 gse = GroupSamplingEstimator(synthesis.PerformanceHistorySynthesizer())
-gse.initialize(20, 0.05, 0.85)
+gse.initialize(25, 0.03, 0.75)
 

@@ -5,8 +5,9 @@ import sklearn.linear_model as lm
 
 # FLAGS
 SIGN_VARIABLES = False
+SEQUENTIAL_ANALAYSIS = False
 
-np.random.seed(629)
+np.random.seed(1852)
 
 class Target:
     def __init__(self, influential):
@@ -25,20 +26,49 @@ def ofat(k: int):
         xs[i+k][1:i+1] = 0
     return(np.unique(xs, axis=0))
    
-target = Target([[300,600], 900])
+target = Target([[300,600,520]])
 tcount = 0
 
 # make groupings123
-f = 16
+f = 64
 groupings = [np.array_split(np.random.choice(np.arange(1024), size=1024, replace=False), f) for i in range(f)]
 
-# make 
-weights = []
+
 
 if SIGN_VARIABLES:
     signs = []
 
+# make 
+weights = []
+coefs = []
 for g in range(f):
+    
+    if SEQUENTIAL_ANALAYSIS and len(weights) > 0:
+        max_influential = list(reversed(np.argsort(coefs[-1])))[-1]
+        # divide group max influential from previous grouping to G_1... G_{f//2}
+        
+        grouping = []
+        for i, group in enumerate(np.array_split(groupings[g][max_influential], f//2)):
+            grouping.append(group)
+        
+        non_influential = []
+        for i in range(f):
+            if i != max_influential:
+                non_influential += list(groupings[g][i])
+                
+        non_influential = np.array(non_influential)
+        np.random.shuffle(non_influential)
+        
+        for i in range(f//2):
+            add = 1024 // f - 1024 // 16 // (16//2)
+            grouping[i] = np.append(grouping[i], non_influential[:add])
+            non_influential = non_influential[add:]
+            
+        for i in np.array_split(non_influential, f//2):
+            grouping.append(i)
+            
+        groupings[g] = grouping
+        
     xs = []
     
     if SIGN_VARIABLES:
@@ -71,6 +101,7 @@ for g in range(f):
     for i in range(linmod.coef_.shape[0]):
         weight[groupings[g][i]] = linmod.coef_[i]
 
+    coefs.append(linmod.coef_)
     weights.append(weight)
 
 weights = np.vstack(weights)
@@ -83,8 +114,8 @@ weights_mean = np.mean(weights, axis=0)
 
 influential = list(reversed(np.argsort(weights_mean)[-3:]))
 
+#plt.plot(np.arange(1024), weights_mean, alpha=0.8)  
 for i in influential:
-    print(i, weights_mean[i])
     weights[:, i] =  weights[:, i] - weights_mean[i]
     for m, grouping in enumerate(groupings):
         g = None
@@ -95,13 +126,11 @@ for i in influential:
         weights[m, g] = weights[m, g] - weights_mean[i] 
     
     weightz_mean = np.mean(weights, axis=0)
-    #plt.pcolormesh(weights)
-    plt.fill_between(np.arange(1024), np.zeros(1024), weightz_mean, alpha=0.7)
-    
-
-#plt.fill_between(np.arange(1024), np.full(1024, -0.2), np.full(1024, 0.2), color="red", alpha=0.1)
-#plt.fill_between(np.arange(1024), np.full(1024, 0.2), np.full(1024, 0.5), color="yellow", alpha=0.1)
-#plt.fill_between(np.arange(1024), np.full(1024, 0.5), np.full(1024, 1), color="green", alpha=0.1)
+print(tcount)
+plt.plot(np.arange(1024), weights_mean, alpha=0.8)   
+#plt.fill_between(np.arange(1024), np.full(1024, -0.2), np.full(1024, 0.2), color="red", alpha=0.7)
+#plt.fill_between(np.arange(1024), np.full(1024, 0.2), np.full(1024, 0.5), color="yellow", alpha=0.7)
+#plt.fill_between(np.arange(1024), np.full(1024, 0.5), np.full(1024, 1), color="green", alpha=0.7)
 #plt.axhline(0.5, color="black", linewidth=0.1)
 plt.show()
             
