@@ -1,9 +1,12 @@
 import numpy as np
 import itertools
 import matplotlib.pyplot as plt
-import scipy.signal as signal
+import scipy.stats as stats
 import synthesis
 import pandas as pd
+import sklearn.utils as utils
+import sklearn.linear_model as lm
+import seaborn as sns
 
 def find_runs(value, a):
     # Create an array that is 1 where a is `value`, and pad each end with an extra 0.
@@ -61,7 +64,7 @@ class Transformation:
         # remove bias correction
         return yss[opt][half_n_revisions:n_revisions + half_n_revisions]
             
-class GroupSamplingEstimator():
+class Estimator():
     
     def __init__(self, synthesizer: synthesis.PerformanceHistorySynthesizer):
         self.synthesizer = synthesizer
@@ -86,7 +89,7 @@ class GroupSamplingEstimator():
         change_map = []
         i = 0
         for config in configs:
-            print(i)
+            #print(i)
             performance = self.synthesizer.synthesize(config)
             revisions = sorted(np.random.choice(np.arange(n_revisions), size=n_sample_revisions, replace=False))
             observations = {rev: performance[rev] for rev in revisions}
@@ -99,54 +102,52 @@ class GroupSamplingEstimator():
             i += 1
         change_map = np.vstack(change_map)
         
+        """
+        # Variant 1: Step-wise correction with bootstrappingxtr tracer
+        feature_weights = np.zeros((change_map.shape[1], configs.shape[1]))
+        feature_iqr = np.zeros((change_map.shape[1], configs.shape[1]))
+        for rev in range(change_map.shape[1]):
+            xs = configs
+            ys = change_map[:,rev]
+            boot_xs = [utils.resample(xs, replace=True, n_samples=len(xs) // 2, random_state=i) for i in range(50)]
+            boot_ys = [utils.resample(ys, replace=True, n_samples=len(ys) // 2, random_state=i) for i in range(50)]
+            
+            model = lm.LinearRegression()
+            weights = []
+            for i in range(50):
+                print("fit", rev)
+                model.fit(boot_xs[i], boot_ys[i])
+                weights.append(model.coef_)
+                
+            weights = np.array(weights)
+            mean = np.median(weights, axis=0)
+            iqr = stats.iqr(weights, axis=0)
+            
+            feature_weights[rev,:] = mean
+            feature_iqr[rev,:] = iqr
+        
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+        ax1.pcolormesh(feature_weights)
+        #ax2.pcolormesh(feature_iqr)    print(i)
+        #plt.show()
+        #return change_map
+        """
         feature_weights1 = np.zeros((configs.shape[1], n_revisions))
         feature_weights0 = np.zeros((configs.shape[1], n_revisions))
         for f in range(configs.shape[1]):
-            print(f)
             indexes1 = np.argwhere(configs[:,f] == 1)
             indexes0 = np.argwhere(configs[:,f] == 0)
             mean1 = np.mean(change_map[indexes1,:], axis=0)
             mean0 = np.mean(change_map[indexes0,:], axis=0)
             feature_weights1[f] = mean1
-            feature_weights0[f] = mean0
+            feature_weights0[f] = mean0#feature_weights
             
         feature_weights = feature_weights1 - feature_weights0
-                
-        #smoothed = np.sum(change_map, axis=0)#pd.DataFrame(np.sum(change_map, axis=0)).rolling(window=30, center=True).mean().values.reshape(1, -1)[0]
-        #fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
         
-        #ax1.pcolormesh(change_map, cmap="binary")
-        #ax1.set_title("Change footprint")
-        #ax1.set_xlabel("time")
-        #ax1.set_ylabel("configuration")
-        #for cm in change_map:
-        #    ax2.plot(np.arange(n_revisions), cm)
-        #ax2.plot(smoothed / len(configs))
-        #ax2.fill_between(np.arange(n_revisions), np.zeros(n_revisions), smoothed.reshape(1, -1)[0] / len(configs), alpha=0.5)
-        #ax2.set_title("Sum of change point probability")
-        #ax2.set_xlabel("time")
-        #ax2.set_ylabel("$\sum_{i \in C} p_i(t)$")
-        cps = self.synthesizer.change_points
-        for cp in cps:
-            plt.axvline(cp[0], color="black")
-            print(cp)
-        #for cp in signal.find_peaks(smoothed, prominence=0.2)[0]:
-        #    ax2.axvline(cp, color="lime", alpha=0.7)
-        # 
-        #pix = [len(signal.find_peaks(smoothed, prominence=promi)[0]) for promi in np.linspace(0,0.9,100)]
-        #print(pix)
-        #plt.plot(np.linspace(0,0.9,100), pix)
-        for ys in range(configs.shape[1]):
-            plt.plot(feature_weights[ys,:])
-        #plt.colorbar()
-        plt.show()
-        
-#dd = np.zeros(1000)
-#dd[400:] += 1
-#dd[800:] += 2
-#s = Transformation().transform_single(1000, {i: dd[i] for i in np.random.choice(np.arange(1000), size=50, replace=False)})
-
-
-gse = GroupSamplingEstimator(synthesis.PerformanceHistorySynthesizer(seed=42))
-gse.initialize(1000, 0.01, 0.5)
+        """for fw in feature_weights:
+            plt.plot(fw)
+            
+        for cp in self.synthesizer.change_points:
+            plt.axvline(cp[0])"""
+        return feature_weights
 
